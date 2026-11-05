@@ -52,8 +52,23 @@ public final class MomEventBus implements IEventBus {
      */
     @Override
     public <T extends Event> void addListener(Consumer<T> listener) {
-        if (listener == null) throw new NullPointerException("listener");
-        add(Event.class, EventPriority.NORMAL, false, event -> {
+        addErasedListener(EventPriority.NORMAL, false, listener);
+    }
+
+    @Override
+    public <T extends Event> void addListener(EventPriority priority, Consumer<T> listener) {
+        addErasedListener(priority, false, listener);
+    }
+
+    @Override
+    public <T extends Event> void addListener(EventPriority priority, boolean receiveCanceled, Consumer<T> listener) {
+        addErasedListener(priority, receiveCanceled, listener);
+    }
+
+    private <T extends Event> void addErasedListener(EventPriority priority, boolean receiveCanceled,
+                                                       Consumer<T> listener) {
+        if (listener == null || priority == null) throw new NullPointerException();
+        add(Event.class, priority, receiveCanceled, event -> {
             try {
                 @SuppressWarnings("unchecked") T typed = (T) event;
                 listener.accept(typed);
