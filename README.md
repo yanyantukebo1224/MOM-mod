@@ -1,65 +1,66 @@
 # MOM — Multi-loader Optimization Middleware
 
-MOM is an experimental Fabric-hosted compatibility project for inspecting and eventually adapting selected Forge and NeoForge mods.
+MOM is an experimental Fabric-hosted compatibility project for inspecting and adapting a deliberately selected subset of Forge 1.20.1 mods.
 
-**Target Minecraft range:** 1.20.1 through 26.3  
-**Current milestone:** static metadata analysis, ASM bytecode reference scanning, explicit class-file remapping, and a Loom-backed Minecraft 1.20.1 development runtime.
+## Current milestone
 
-## Current status
+**MOM 0.3.0 — first Forge runtime vertical slice.**
 
-| Component | Status |
-|---|---|
-| Shared API and compatibility report types | Implemented |
-| Static JAR metadata analyzer | Initial implementation |
-| ASM bytecode reference scanner | Implemented; static inspection only |
-| Analyzer CLI | Implemented |
-| Explicit ASM class-file remapper | Implemented; requires caller-supplied mappings |
-| Forge and NeoForge metadata adapters | Initial implementation |
-| Version-family assessment | Initial conservative implementation |
-| Fabric 1.20.1 Loom development environment | Configured; actual client launch still needs runtime verification |
-| Fabric 26.3 bootstrap | Initial entrypoint; not yet Loom-integrated |
-| Translation catalog and token validator | Initial implementation |
-| Forge/NeoForge API bridge implementations | Not implemented |
-| Automatic Forge-to-MOM remapping rules | Not implemented |
-| Successful Forge/NeoForge mod execution | Not implemented |
+- Static JAR metadata analysis and ASM bytecode reference scanning.
+- Explicit ASM class-file remapping primitive.
+- Fabric 1.20.1 Loom development runtime.
+- Experimental Forge-style mod discovery from `config/mom/forge-mods`.
+- Initial compatibility shims for `@Mod`, `IEventBus`, `@SubscribeEvent`, `FMLJavaModLoadingContext`, `FMLCommonSetupEvent`, and `FMLLoadCompleteEvent`.
+- A tiny Forge-API fixture JAR and automated loader/event-bus tests.
 
-## Architecture
+## Build
 
-- `mom-api`: shared descriptors and result types.
-- `mom-analyzer`: metadata inspection, bytecode reference scanning, and CLI.
-- `mom-transformer`: explicit ASM class-file remapping.
-- `mom-forge` / `mom-neoforge`: loader-specific metadata adapters; API bridges remain future work.
-- `mom-version-adapter`: conservative source/target version assessment.
-- `mom-fabric-1201`: Loom-backed Minecraft 1.20.1 Fabric development runtime.
-- `mom-fabric-263`: separate initial Fabric bootstrap for Minecraft 26.3.
-- `mom-translation`: locale catalogs, fallback resolution, and format-token validation.
-
-## Build and launch (Minecraft 1.20.1)
-
-Requires JDK 25 for the current multi-module build and Gradle 9.8.0.
+Requires JDK 25 and Gradle 9.8.0.
 
 ```bash
 gradle clean test
 gradle build
+gradle :mom-fabric-1201:remapJar
+gradle :mom-fabric-1201:forgeFixtureJar
 gradle :mom-fabric-1201:runClient
 ```
 
-Loom prepares Minecraft, mappings, dependencies, and Fabric run configurations. The `runClient` task launches the development client with MOM loaded. The first launch downloads Minecraft libraries and assets and can take a while.
+The normal runtime artifact is produced under `mom-fabric-1201/build/libs/`. The separate `*-forge-fixture.jar` is only a test mod.
 
-GitHub Actions runs unit tests and builds all modules on pushes and pull requests. The Fabric runtime JARs are uploaded as a workflow artifact when the workflow succeeds.
+## Try the Forge compatibility slice
 
-## Analyze a mod JAR
+1. Install Fabric Loader for Minecraft 1.20.1.
+2. Put the MOM runtime JAR in the Fabric instance's `mods` directory.
+3. Put a trusted Forge 1.20.1 mod JAR in `config/mom/forge-mods/`.
+4. Start the game and inspect the log for `[MOM/Forge]`.
 
-```bash
-gradle :mom-analyzer:run --args="path/to/mod.jar"
-```
+The CI artifact also contains a small `momfixture` JAR that exercises the currently supported subset. It is not a gameplay mod.
 
-The analyzer reports loader metadata, class-file version, referenced namespaces, and discovered loader API references. It does not load or execute classes from the inspected archive.
+## Compatibility boundary — read before testing
 
-## Important compatibility note
+This is **not full Forge compatibility**. The first runtime slice currently supports:
+- A class annotated with `@net.minecraftforge.fml.common.Mod` whose ID appears in `META-INF/mods.toml`.
+- A no-argument mod constructor.
+- Obtaining the mod event bus during construction.
+- Registering subscribers with `IEventBus.register` and `@SubscribeEvent`.
+- Explicitly typed `IEventBus.addListener(EventClass.class, consumer)`.
+- Synchronous dispatch of MOM's common-setup and load-complete lifecycle events.
 
-A detected mod is not necessarily loadable. Bytecode reference scanning is not semantic analysis, and explicit remapping is not equivalent to implementing the target API. MOM does not yet emulate Forge/NeoForge event buses, registries, lifecycle, capabilities, networking, mixin behavior, or data migration. No Forge/NeoForge mod execution compatibility is claimed until a specific mod/version/game-version combination passes an actual Minecraft runtime test.
+It does not yet implement registries, deferred registers, MinecraftForge gameplay events, capabilities, networking, configs, Dist/DistExecutor, access transformers, coremods, mixin remapping, Forge services, mod dependency resolution, or the full Forge EventBus API. Many real Forge mods will not load yet. Mods using Forge classes outside this subset can fail during class loading or construction.
 
-## License
+Forge mod JARs execute code inside the game process. Only test JARs from sources you trust. Use a separate game instance and back up saves.
 
-MIT.
+The runtime loader scans the dedicated `config/mom/forge-mods` directory so Fabric's own mod discovery remains separate. It does not automatically convert every file in the normal `mods` folder.
+
+## Project modules
+
+- `mom-api`: shared compatibility report types.
+- `mom-analyzer`: static metadata and bytecode analysis CLI.
+- `mom-transformer`: explicit ASM remapping primitive.
+- `mom-forge` / `mom-neoforge`: metadata adapters.
+- `mom-version-adapter`: conservative Minecraft version-family assessment.
+- `mom-fabric-1201`: active Loom runtime and first Forge compatibility slice.
+- `mom-fabric-263`: separate early bootstrap for Minecraft 26.3.
+- `mom-translation`: translation catalogs and token validation.
+
+No NeoForge runtime compatibility is claimed yet.

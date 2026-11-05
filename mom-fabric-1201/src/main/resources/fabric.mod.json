@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "mom",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "MOM",
-  "description": "Multi-loader Optimization Middleware bootstrap for Minecraft 1.20.1",
+  "description": "Experimental Forge 1.20.1 compatibility bridge hosted on Fabric",
   "environment": "*",
   "entrypoints": { "main": ["dev.mom.fabric.MomFabricEntrypoint"] },
   "depends": { "fabricloader": ">=0.15.11", "minecraft": "1.20.1", "java": ">=17" }

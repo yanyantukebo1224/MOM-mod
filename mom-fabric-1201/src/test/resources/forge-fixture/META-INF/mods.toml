@@ -1,0 +1,9 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="momfixture"
+version="1.0.0"
+displayName="MOM Forge Compatibility Fixture"
+description="A tiny Forge API fixture for MOM integration tests."

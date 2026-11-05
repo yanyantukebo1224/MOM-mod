@@ -21,16 +21,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.8.0'
-      - name: Run unit tests
+      - name: Run unit and Forge bridge integration tests
         run: gradle --no-daemon clean test
       - name: Build all modules
         run: gradle --no-daemon build
-      - name: Upload runtime JARs
+      - name: Build runtime and fixture JARs
+        run: gradle --no-daemon :mom-fabric-1201:remapJar :mom-fabric-1201:forgeFixtureJar
+      - name: Upload runtime and fixture JARs
         uses: actions/upload-artifact@v4
         with:
-          name: mom-fabric-runtime-jars
+          name: mom-1.20.1-runtime-and-fixture
           path: |
             mom-fabric-1201/build/libs/*.jar
-            mom-fabric-263/build/libs/*.jar
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
