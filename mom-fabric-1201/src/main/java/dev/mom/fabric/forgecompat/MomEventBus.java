@@ -99,15 +99,17 @@ public final class MomEventBus implements IEventBus {
     @Override
     public boolean post(Event event) {
         if (event == null) throw new NullPointerException("event");
-        List<Handler> snapshot = new ArrayList<>(handlers);
-        snapshot.sort(Comparator.comparing((Handler h) -> h.priority().ordinal())
-                .thenComparingLong(Handler::sequence));
-        for (Handler handler : snapshot) {
-            if (!handler.eventType().isAssignableFrom(event.getClass())) continue;
-            if (event.isCanceled() && !handler.receiveCanceled()) continue;
-            handler.callback().accept(event);
+        try (ModLoadingContextScope ignored = ModLoadingContextScope.enter(this)) {
+            List<Handler> snapshot = new ArrayList<>(handlers);
+            snapshot.sort(Comparator.comparing((Handler h) -> h.priority().ordinal())
+                    .thenComparingLong(Handler::sequence));
+            for (Handler handler : snapshot) {
+                if (!handler.eventType().isAssignableFrom(event.getClass())) continue;
+                if (event.isCanceled() && !handler.receiveCanceled()) continue;
+                handler.callback().accept(event);
+            }
+            return event.isCanceled();
         }
-        return event.isCanceled();
     }
 
     private void add(Class<? extends Event> type, EventPriority priority, boolean receiveCanceled,
