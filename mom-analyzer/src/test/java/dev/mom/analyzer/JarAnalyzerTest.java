@@ -36,8 +36,14 @@ class JarAnalyzerTest {
         Path jar = temp.resolve("forge-sample.jar");
         try (var out = new ZipOutputStream(Files.newOutputStream(jar))) {
             out.putNextEntry(new ZipEntry("META-INF/mods.toml"));
-            String toml = "[[mods]]\nmodId=\"sampleforge\"\nversion=\"1.2.3\"\n"
-                    + "[[dependencies.sampleforge]]\nmodId=\"minecraft\"\nversionRange=\"[1.20.1,1.21)\"\n";
+            String toml = """
+                    [[mods]]
+                    modId="sampleforge"
+                    version="1.2.3"
+                    [[dependencies.sampleforge]]
+                    modId="minecraft"
+                    versionRange="[1.20.1,1.21)"
+                    """;
             out.write(toml.getBytes(StandardCharsets.UTF_8));
             out.closeEntry();
         }
@@ -52,7 +58,12 @@ class JarAnalyzerTest {
         Path jar = temp.resolve("neo-sample.jar");
         try (var out = new ZipOutputStream(Files.newOutputStream(jar))) {
             out.putNextEntry(new ZipEntry("META-INF/neoforge.mods.toml"));
-            out.write("[[mods]]\\nmodId=\\"sampleneo\\"\\nversion=\\"2.0.0\\"\\n".getBytes(StandardCharsets.UTF_8));
+            String toml = """
+                    [[mods]]
+                    modId="sampleneo"
+                    version="2.0.0"
+                    """;
+            out.write(toml.getBytes(StandardCharsets.UTF_8));
             out.closeEntry();
         }
         var report = new JarAnalyzer().analyze(jar);
