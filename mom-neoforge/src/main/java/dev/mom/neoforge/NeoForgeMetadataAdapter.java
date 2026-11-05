@@ -10,10 +10,21 @@ import java.util.regex.Pattern;
 
 /** Conservative parser for common META-INF/neoforge.mods.toml metadata. */
 public final class NeoForgeMetadataAdapter {
-    private static final Pattern BLOCK = Pattern.compile("(?s)\\[\\[mods]](.*?)(?=\\[\\[|\\z)");
+    private static final Pattern BLOCK = Pattern.compile("(?s)\\[\\[mods\\]\\](.*?)(?=\\[\\[|\\z)");
     private static final Pattern FIELD = Pattern.compile("(?m)^\\s*(modId|version)\\s*=\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern DEPENDENCY = Pattern.compile("(?s)\\[\\[dependencies\\.[^\\]]+\\]\\](.*?)(?=\\[\\[|\\z)");
+    private static final Pattern MINECRAFT_ID = Pattern.compile("(?m)^\\s*modId\\s*=\\s*[\"']minecraft[\"']");
+    private static final Pattern VERSION_RANGE = Pattern.compile("(?m)^\\s*versionRange\\s*=\\s*[\"']([^\"']+)[\"']");
 
     public List<ModDescriptor> parse(String toml) {
+        List<String> minecraftRanges = new ArrayList<>();
+        Matcher dependencies = DEPENDENCY.matcher(toml);
+        while (dependencies.find()) {
+            Matcher id = MINECRAFT_ID.matcher(dependencies.group(1));
+            Matcher range = VERSION_RANGE.matcher(dependencies.group(1));
+            if (id.find() && range.find()) minecraftRanges.add(range.group(1));
+        }
+
         List<ModDescriptor> result = new ArrayList<>();
         Matcher blocks = BLOCK.matcher(toml);
         while (blocks.find()) {
@@ -24,7 +35,7 @@ public final class NeoForgeMetadataAdapter {
                 if (fields.group(1).equals("version")) version = fields.group(2);
             }
             if (id != null) result.add(new ModDescriptor(id, version, LoaderKind.NEOFORGE,
-                    List.of(), List.of(), List.of(),
+                    minecraftRanges, List.of(), List.of(),
                     List.of("Partial TOML parser: dependency features and NeoForge-specific metadata are not fully modeled.")));
         }
         return List.copyOf(result);
