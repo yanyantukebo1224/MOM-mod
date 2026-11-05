@@ -64,6 +64,11 @@ public final class MomEventBus implements IEventBus {
     }
 
     @Override
+    public <T extends Event> void addListener(Class<T> eventType, Consumer<T> listener) {
+        addListener(EventPriority.NORMAL, false, eventType, listener);
+    }
+
+    @Override
     public <T extends Event> void addListener(EventPriority priority, Class<T> eventType,
                                                Consumer<T> listener) {
         addListener(priority, false, eventType, listener);
