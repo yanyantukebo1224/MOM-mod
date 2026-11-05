@@ -1,56 +1,50 @@
 # MOM — Multi-loader Optimization Middleware
 
-MOM is an experimental compatibility layer that aims to run selected Forge and NeoForge mods on a Fabric-based Minecraft runtime, while also handling differences between Minecraft versions.
+MOM is an experimental Fabric-hosted compatibility project for inspecting and eventually adapting selected Forge and NeoForge mods.
 
-**Target range:** Minecraft 1.20.1 through 26.3  
-**Initial engineering milestone:** build a reliable, testable core before attempting loader or game-class emulation.
+**Target Minecraft range:** 1.20.1 through 26.3  
+**Current milestone:** static JAR analysis, compatibility metadata, and two Fabric bootstrap artifacts.
 
-## Project status
+## Current status
 
-This repository is at the foundation stage. It does **not** yet load Forge or NeoForge mods. Compatibility is a per-mod, per-version engineering problem; a successful JAR scan is not proof that a mod can run.
-
-| Area | Status |
+| Component | Status |
 |---|---|
-| Core architecture and module boundaries | In progress |
-| Translation catalog / validation core | Initial implementation |
-| Mod metadata and JAR analysis | Planned |
-| Forge compatibility adapter | Planned |
-| NeoForge compatibility adapter | Planned |
-| Minecraft version adapters | Planned |
-| Fabric runtime integration | Planned |
-| Automated game-level compatibility tests | Planned |
+| Shared API and compatibility report types | Implemented |
+| Static JAR analyzer (Fabric / Forge / NeoForge metadata) | Initial implementation |
+| Forge and NeoForge metadata adapters | Initial implementation |
+| Version-family assessment | Initial conservative implementation |
+| Fabric 1.20.1 bootstrap | Initial runtime entrypoint |
+| Fabric 26.3 bootstrap | Initial runtime entrypoint |
+| Translation catalog and token validator | Initial implementation |
+| Forge/NeoForge API emulation and mod execution | Not implemented |
+| Minecraft internals / bytecode version conversion | Not implemented |
 
-## Design principles
+## Architecture
 
-1. **Fabric is the host runtime.** MOM does not replace Fabric Loader.
-2. **Separate loader compatibility from game-version compatibility.**
-3. **Detect before transforming.** Analyze mod metadata and bytecode before attempting compatibility work.
-4. **Prefer explicit adapters and tested patches** over broad, unsafe bytecode rewriting.
-5. **Translation is layered and offline-first.** Existing mod translations take priority; MOM/community translations fill gaps; automatic translation is an optional provider, never a required network dependency.
-6. **Report unsupported behavior clearly.** Do not silently claim compatibility.
+- `mom-api`: shared descriptors and result types.
+- `mom-analyzer`: inspects JAR metadata without executing archive classes.
+- `mom-forge` / `mom-neoforge`: loader-specific metadata adapters.
+- `mom-version-adapter`: conservative source/target version assessment.
+- `mom-fabric-1201` / `mom-fabric-263`: separate Fabric bootstrap artifacts.
+- `mom-translation`: locale catalogs, fallback resolution, and format-token validation.
 
-## Repository layout
-
-- `mom-translation` — language catalog, fallback resolution, and format-token validation.
-- `docs/ARCHITECTURE.md` — compatibility pipeline and module boundaries.
-- `docs/TRANSLATION.md` — translation data flow and safety rules.
-- `docs/COMPATIBILITY.md` — support policy and test strategy.
+The 1.20.1 and 26.3 Fabric targets are intentionally separate. Fabric's 26.3 toolchain uses a newer Loom/Gradle generation and Java 25; the current bootstrap modules only compile against Fabric Loader APIs and do not yet use mapped Minecraft classes.
 
 ## Build
 
-Requires JDK 25 and Gradle 9.7.1 for the initial development toolchain.
+Requires JDK 25 and Gradle 9.6.0.
 
 ```bash
-gradle test
+gradle clean test
 gradle build
 ```
 
-The initial build is a pure-Java foundation. Minecraft/Fabric dependencies will be introduced in version-specific runtime modules after the target matrix is pinned.
+GitHub Actions runs unit tests and builds all modules on pushes and pull requests. The two runtime JARs are uploaded as a workflow artifact.
 
-## Compatibility expectations
+## Important compatibility note
 
-MOM will not promise that every old mod can run on every new Minecraft version. Mods that depend on removed game internals, native libraries, mixin injection points, core transformers, or loader-specific lifecycle behavior may require dedicated adapters or may remain unsupported.
+A detected mod is not necessarily loadable. This analyzer does not yet resolve all bytecode references, mixin targets, core transformers, event semantics, registries, capabilities, or data migrations. Forge/NeoForge mod execution remains future work; no compatibility claim is made until a specific mod/version/game-version combination passes runtime tests.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT.
