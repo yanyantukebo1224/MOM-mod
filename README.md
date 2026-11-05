@@ -36,7 +36,7 @@ MOM is an experimental Fabric-hosted compatibility project for inspecting and ev
 
 ## Build and launch (Minecraft 1.20.1)
 
-Requires JDK 25 for the current multi-module build and Gradle 9.6.0.
+Requires JDK 25 for the current multi-module build and Gradle 9.8.0.
 
 ```bash
 gradle clean test
