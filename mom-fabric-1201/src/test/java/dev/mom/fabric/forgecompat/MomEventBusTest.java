@@ -46,6 +46,24 @@ class MomEventBusTest {
         assertEquals(List.of("setup"), subscriber.calls);
     }
 
+    @Test void exposesCurrentModContextDuringEventDispatch() {
+        MomEventBus bus = new MomEventBus();
+        IEventBus[] current = {null};
+        bus.addListener(FMLCommonSetupEvent.class, event ->
+                current[0] = net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus());
+        bus.post(new FMLCommonSetupEvent());
+        assertSame(bus, current[0]);
+    }
+
+    @Test void supportsPriorityOnErasedConsumerOverload() {
+        MomEventBus bus = new MomEventBus();
+        List<String> calls = new ArrayList<>();
+        bus.addListener(EventPriority.LOW, (FMLCommonSetupEvent event) -> calls.add("low"));
+        bus.addListener(EventPriority.HIGH, (FMLCommonSetupEvent event) -> calls.add("high"));
+        bus.post(new FMLCommonSetupEvent());
+        assertEquals(List.of("high", "low"), calls);
+    }
+
     @Test void skipsListenersWhenCanceledUnlessOptedIn() {
         MomEventBus bus = new MomEventBus();
         int[] calls = {0};
