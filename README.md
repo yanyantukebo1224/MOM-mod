@@ -3,7 +3,7 @@
 MOM is an experimental Fabric-hosted compatibility project for inspecting and eventually adapting selected Forge and NeoForge mods.
 
 **Target Minecraft range:** 1.20.1 through 26.3  
-**Current milestone:** static metadata analysis, ASM bytecode reference scanning, and an explicit class-file remapping engine.
+**Current milestone:** static metadata analysis, ASM bytecode reference scanning, explicit class-file remapping, and a Loom-backed Minecraft 1.20.1 development runtime.
 
 ## Current status
 
@@ -16,12 +16,12 @@ MOM is an experimental Fabric-hosted compatibility project for inspecting and ev
 | Explicit ASM class-file remapper | Implemented; requires caller-supplied mappings |
 | Forge and NeoForge metadata adapters | Initial implementation |
 | Version-family assessment | Initial conservative implementation |
-| Fabric 1.20.1 bootstrap | Initial runtime entrypoint |
-| Fabric 26.3 bootstrap | Initial runtime entrypoint |
+| Fabric 1.20.1 Loom development environment | Configured; actual client launch still needs runtime verification |
+| Fabric 26.3 bootstrap | Initial entrypoint; not yet Loom-integrated |
 | Translation catalog and token validator | Initial implementation |
 | Forge/NeoForge API bridge implementations | Not implemented |
 | Automatic Forge-to-MOM remapping rules | Not implemented |
-| Minecraft runtime integration and real mod execution | Not implemented |
+| Successful Forge/NeoForge mod execution | Not implemented |
 
 ## Architecture
 
@@ -30,25 +30,25 @@ MOM is an experimental Fabric-hosted compatibility project for inspecting and ev
 - `mom-transformer`: explicit ASM class-file remapping.
 - `mom-forge` / `mom-neoforge`: loader-specific metadata adapters; API bridges remain future work.
 - `mom-version-adapter`: conservative source/target version assessment.
-- `mom-fabric-1201` / `mom-fabric-263`: separate Fabric bootstrap artifacts.
+- `mom-fabric-1201`: Loom-backed Minecraft 1.20.1 Fabric development runtime.
+- `mom-fabric-263`: separate initial Fabric bootstrap for Minecraft 26.3.
 - `mom-translation`: locale catalogs, fallback resolution, and format-token validation.
 
-The 1.20.1 and 26.3 Fabric targets are intentionally separate. The current bootstrap modules compile against Fabric Loader APIs but do not yet provide a complete mapped Minecraft runtime integration.
+## Build and launch (Minecraft 1.20.1)
 
-## Build
-
-Requires JDK 25 and Gradle 9.6.0.
+Requires JDK 25 for the current multi-module build and Gradle 9.6.0.
 
 ```bash
 gradle clean test
 gradle build
+gradle :mom-fabric-1201:runClient
 ```
 
-GitHub Actions runs unit tests and builds all modules on pushes and pull requests. Runtime JAR artifacts are uploaded when the workflow succeeds.
+Loom prepares Minecraft, mappings, dependencies, and Fabric run configurations. The `runClient` task launches the development client with MOM loaded. The first launch downloads Minecraft libraries and assets and can take a while.
+
+GitHub Actions runs unit tests and builds all modules on pushes and pull requests. The Fabric runtime JARs are uploaded as a workflow artifact when the workflow succeeds.
 
 ## Analyze a mod JAR
-
-After building, run:
 
 ```bash
 gradle :mom-analyzer:run --args="path/to/mod.jar"
