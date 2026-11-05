@@ -2,7 +2,7 @@ plugins { base }
 
 allprojects {
     group = "dev.mom"
-    version = "0.2.0-SNAPSHOT"
+    version = "0.3.0-SNAPSHOT"
     repositories {
         mavenCentral()
         maven { url = uri("https://maven.fabricmc.net/") }
