@@ -27,6 +27,23 @@ jobs:
         run: gradle --no-daemon build
       - name: Build runtime and fixture JARs
         run: gradle --no-daemon :mom-fabric-1201:remapJar :mom-fabric-1201:forgeFixtureJar
+      - name: Smoke test Minecraft client with Forge fixture
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          mkdir -p mom-fabric-1201/run/config/mom/forge-mods
+          cp mom-fabric-1201/build/libs/*-forge-fixture.jar mom-fabric-1201/run/config/mom/forge-mods/
+          set +e
+          timeout --signal=TERM --kill-after=15s 300s xvfb-run -a gradle --no-daemon :mom-fabric-1201:runClient > /tmp/mom-run-client.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/mom-run-client.log
+          if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
+            exit "$status"
+          fi
+          grep -F "[MOM/Forge] Constructed momfixture" /tmp/mom-run-client.log
+          grep -F "[MOM/Forge] Loaded 1 Forge-style mod(s)" /tmp/mom-run-client.log
       - name: Upload runtime and fixture JARs
         uses: actions/upload-artifact@v4
         with:
