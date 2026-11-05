@@ -19,8 +19,8 @@ subprojects {
         options.release.set(if (project.name == "mom-fabric-263") 25 else 17)
     }
     dependencies {
-        "testImplementation"(platform("org.junit:junit-bom:5.13.4"))
-        "testImplementation"("org.junit.jupiter:junit-jupiter")
+        add("testImplementation", platform("org.junit:junit-bom:5.13.4"))
+        add("testImplementation", "org.junit.jupiter:junit-jupiter")
     }
     tasks.withType<Test>().configureEach { useJUnitPlatform() }
 }
