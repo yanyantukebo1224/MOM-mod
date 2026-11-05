@@ -118,35 +118,32 @@ public final class MomForgeModLoader {
                 if (entry.isDirectory() || !name.endsWith(".class") ||
                         name.equals("module-info.class") || name.endsWith("package-info.class")) continue;
                 String className = name.substring(0, name.length() - 6).replace('/', '.');
-                Class<?> type;
                 try {
-                    type = Class.forName(className, false, classLoader);
-                } catch (LinkageError | ClassNotFoundException ex) {
-                    continue;
-                }
-                Mod annotation = type.getAnnotation(Mod.class);
-                if (annotation == null || !candidate.modIds().contains(annotation.value())) continue;
-                if (!loadedIds.add(annotation.value())) {
-                    diagnostics.add(candidate.path().getFileName() + ": duplicate mod id " + annotation.value() + " skipped.");
-                    continue;
-                }
-                if (Modifier.isAbstract(type.getModifiers()) || type.isInterface()) {
-                    diagnostics.add(annotation.value() + ": @Mod class is not constructible.");
-                    continue;
-                }
-                try {
-                    Constructor<?> constructor = type.getDeclaredConstructor();
-                    constructor.setAccessible(true);
-                    IEventBus bus = new MomEventBus();
-                    try (ModLoadingContextScope ignored = ModLoadingContextScope.enter(bus)) {
-                        constructor.newInstance();
+                    Class<?> type = Class.forName(className, false, classLoader);
+                    Mod annotation = type.getAnnotation(Mod.class);
+                    if (annotation == null || !candidate.modIds().contains(annotation.value())) continue;
+                    if (!loadedIds.add(annotation.value())) {
+                        diagnostics.add(candidate.path().getFileName() + ": duplicate mod id " + annotation.value() + " skipped.");
+                        continue;
                     }
-                    loaded.add(new LoadedMod(annotation.value(), bus));
-                    System.out.println("[MOM/Forge] Constructed " + annotation.value() + " (" + type.getName() + ")");
-                } catch (NoSuchMethodException ex) {
-                    diagnostics.add(annotation.value() + ": only no-argument @Mod constructors are supported in this milestone.");
-                } catch (ReflectiveOperationException | RuntimeException ex) {
-                    diagnostics.add(annotation.value() + ": constructor failed: " + ex);
+                    if (Modifier.isAbstract(type.getModifiers()) || type.isInterface()) {
+                        diagnostics.add(annotation.value() + ": @Mod class is not constructible.");
+                        continue;
+                    }
+                    try {
+                        Constructor<?> constructor = type.getDeclaredConstructor();
+                        constructor.setAccessible(true);
+                        IEventBus bus = new MomEventBus();
+                        try (ModLoadingContextScope ignored = ModLoadingContextScope.enter(bus)) {
+                            constructor.newInstance();
+                        }
+                        loaded.add(new LoadedMod(annotation.value(), bus));
+                        System.out.println("[MOM/Forge] Constructed " + annotation.value() + " (" + type.getName() + ")");
+                    } catch (NoSuchMethodException ex) {
+                        diagnostics.add(annotation.value() + ": only no-argument @Mod constructors are supported in this milestone.");
+                    }
+                } catch (LinkageError | ReflectiveOperationException | RuntimeException ex) {
+                    diagnostics.add(className + ": skipped because its class or annotations could not be resolved: " + ex);
                 }
             }
         } catch (IOException ex) {
