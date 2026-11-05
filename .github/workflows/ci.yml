@@ -30,12 +30,11 @@ jobs:
       - name: Smoke test Minecraft client with Forge fixture
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
+          command -v xvfb-run
           mkdir -p mom-fabric-1201/run/config/mom/forge-mods
           cp mom-fabric-1201/build/libs/*-forge-fixture.jar mom-fabric-1201/run/config/mom/forge-mods/
           set +e
-          timeout --signal=TERM --kill-after=15s 300s xvfb-run -a gradle --no-daemon :mom-fabric-1201:runClient > /tmp/mom-run-client.log 2>&1
+          timeout --signal=TERM --kill-after=10s 90s xvfb-run -a gradle --no-daemon :mom-fabric-1201:runClient > /tmp/mom-run-client.log 2>&1
           status=$?
           set -e
           cat /tmp/mom-run-client.log
