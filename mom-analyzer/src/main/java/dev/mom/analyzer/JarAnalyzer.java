@@ -21,29 +21,22 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/**
- * Static, non-executing first-pass JAR analyzer. It never defines or loads
- * classes from the inspected archive.
- */
+/** Static, non-executing first-pass JAR analyzer. Archive classes are never loaded. */
 public final class JarAnalyzer {
-    private static final Pattern TOML_MOD_ID = Pattern.compile(
-            "(?s)\\[\\[mods]]\\s*.*?\\bmodId\\s*=\\s*[\"']([^\"']+)[\"']");
-    private static final Pattern TOML_VERSION = Pattern.compile(
-            "(?s)\\[\\[mods]]\\s*.*?\\bversion\\s*=\\s*[\"']([^\"']+)[\"']");
-    private static final Pattern TOML_DEPENDENCY = Pattern.compile(
-            "(?s)\\[\\[dependencies\\.([A-Za-z0-9_.-]+)]]\\s*.*?\\bversionRange\\s*=\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern TOML_MOD_BLOCK = Pattern.compile("(?s)\\[\\[mods\\]\\](.*?)(?=\\[\\[|\\z)");
+    private static final Pattern TOML_FIELD = Pattern.compile("(?m)^\\s*(modId|version)\\s*=\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern TOML_DEPENDENCY = Pattern.compile("(?s)\\[\\[dependencies\\.([A-Za-z0-9_.-]+)\\]\\](.*?)(?=\\[\\[|\\z)");
+    private static final Pattern TOML_DEP_MOD_ID = Pattern.compile("(?m)^\\s*modId\\s*=\\s*[\"']minecraft[\"']");
+    private static final Pattern TOML_VERSION_RANGE = Pattern.compile("(?m)^\\s*versionRange\\s*=\\s*[\"']([^\"']+)[\"']");
 
     public AnalysisReport analyze(Path jar) {
         List<ModDescriptor> mods = new ArrayList<>();
         List<String> findings = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-
         if (jar == null || !jar.toString().toLowerCase(Locale.ROOT).endsWith(".jar")) {
             return new AnalysisReport(jar == null ? Path.of(".") : jar,
-                    CompatibilityStatus.UNSUPPORTED, mods, findings,
-                    List.of("Input must be a .jar file."));
+                    CompatibilityStatus.UNSUPPORTED, mods, findings, List.of("Input must be a .jar file."));
         }
-
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             ZipEntry fabric = zip.getEntry("fabric.mod.json");
             ZipEntry forge = zip.getEntry("META-INF/mods.toml");
@@ -53,25 +46,19 @@ public final class JarAnalyzer {
                     mods.add(parseFabric(JsonParser.parseReader(reader).getAsJsonObject()));
                 }
             }
-            if (forge != null) {
-                String text = read(zip, forge);
-                mods.addAll(parseToml(text, LoaderKind.FORGE));
-            }
-            if (neo != null) {
-                String text = read(zip, neo);
-                mods.addAll(parseToml(text, LoaderKind.NEOFORGE));
-            }
+            if (forge != null) mods.addAll(parseToml(read(zip, forge), LoaderKind.FORGE));
+            if (neo != null) mods.addAll(parseToml(read(zip, neo), LoaderKind.NEOFORGE));
             if (mods.isEmpty()) {
                 findings.add("No recognized Fabric, Forge, or NeoForge metadata was found.");
                 return new AnalysisReport(jar, CompatibilityStatus.UNKNOWN, mods, findings, errors);
             }
-
             int classCount = countClasses(zip);
             findings.add("Archive contains " + classCount + " class file(s).");
-            if (classCount > 0) findings.add("Static class references are not yet resolved; bytecode compatibility remains unknown.");
+            if (classCount > 0) findings.add("Bytecode references and injection targets are not yet analyzed.");
             for (ModDescriptor mod : mods) {
                 if (!mod.mixinConfigs().isEmpty()) findings.add(mod.id() + " declares mixin configuration(s): " + mod.mixinConfigs());
-                if (mod.loader() != LoaderKind.FABRIC) findings.add(mod.id() + " requires a " + mod.loader() + " adapter; detection is not loadability.");
+                if (mod.loader() != LoaderKind.FABRIC) findings.add(mod.id() + " needs a " + mod.loader() + " runtime bridge; detection is not loadability.");
+                findings.addAll(mod.warnings());
             }
             return new AnalysisReport(jar, CompatibilityStatus.ANALYZED, mods, findings, errors);
         } catch (IOException | RuntimeException ex) {
@@ -85,12 +72,10 @@ public final class JarAnalyzer {
         String version = string(json, "version", "unknown");
         List<String> entrypoints = new ArrayList<>();
         JsonElement ep = json.get("entrypoints");
-        if (ep != null && ep.isJsonObject()) {
-            ep.getAsJsonObject().entrySet().forEach(e -> {
-                if (e.getValue().isJsonArray()) e.getValue().getAsJsonArray().forEach(v -> entrypoints.add(v.toString()));
-                else entrypoints.add(e.getValue().toString());
-            });
-        }
+        if (ep != null && ep.isJsonObject()) ep.getAsJsonObject().entrySet().forEach(e -> {
+            if (e.getValue().isJsonArray()) e.getValue().getAsJsonArray().forEach(v -> entrypoints.add(v.toString()));
+            else entrypoints.add(e.getValue().toString());
+        });
         List<String> mixins = new ArrayList<>();
         JsonElement mx = json.get("mixins");
         if (mx != null && mx.isJsonArray()) mx.getAsJsonArray().forEach(v -> mixins.add(v.isJsonPrimitive() ? v.getAsString() : v.toString()));
@@ -104,30 +89,30 @@ public final class JarAnalyzer {
     }
 
     private static List<ModDescriptor> parseToml(String text, LoaderKind loader) {
-        Matcher ids = TOML_MOD_ID.matcher(text);
-        Matcher versions = TOML_VERSION.matcher(text);
-        List<String> foundIds = new ArrayList<>();
-        List<String> foundVersions = new ArrayList<>();
-        while (ids.find()) foundIds.add(ids.group(1));
-        while (versions.find()) foundVersions.add(versions.group(1));
         List<String> constraints = new ArrayList<>();
-        Matcher deps = TOML_DEPENDENCY.matcher(text);
-        while (deps.find()) {
-            if (deps.group(1).equalsIgnoreCase("minecraft")) constraints.add(deps.group(2));
+        Matcher dependency = TOML_DEPENDENCY.matcher(text);
+        while (dependency.find()) {
+            Matcher id = TOML_DEP_MOD_ID.matcher(dependency.group(2));
+            Matcher range = TOML_VERSION_RANGE.matcher(dependency.group(2));
+            if (id.find() && range.find()) constraints.add(range.group(1));
         }
         List<ModDescriptor> result = new ArrayList<>();
-        for (int i = 0; i < foundIds.size(); i++) {
-            String version = i < foundVersions.size() ? foundVersions.get(i) : "unknown";
-            result.add(new ModDescriptor(foundIds.get(i), version, loader, constraints,
-                    List.of(), List.of(), List.of("TOML parsed with conservative metadata scanner; full TOML semantics are not implemented.")));
+        Matcher blocks = TOML_MOD_BLOCK.matcher(text);
+        while (blocks.find()) {
+            String id = null, version = "unknown";
+            Matcher fields = TOML_FIELD.matcher(blocks.group(1));
+            while (fields.find()) {
+                if (fields.group(1).equals("modId")) id = fields.group(2);
+                if (fields.group(1).equals("version")) version = fields.group(2);
+            }
+            if (id != null) result.add(new ModDescriptor(id, version, loader, constraints,
+                    List.of(), List.of(), List.of("TOML support is conservative; conditional dependency semantics are not evaluated.")));
         }
         return result;
     }
 
     private static String read(ZipFile zip, ZipEntry entry) throws IOException {
-        try (var in = zip.getInputStream(entry)) {
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        try (var in = zip.getInputStream(entry)) { return new String(in.readAllBytes(), StandardCharsets.UTF_8); }
     }
 
     private static int countClasses(ZipFile zip) {
