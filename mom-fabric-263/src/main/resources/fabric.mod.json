@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "mom",
+  "version": "0.2.0",
+  "name": "MOM",
+  "description": "MOM bootstrap for Minecraft 26.3",
+  "environment": "*",
+  "entrypoints": { "main": ["dev.mom.fabric.MomFabricEntrypoint"] },
+  "depends": { "fabricloader": ">=0.20.1", "minecraft": "26.3", "java": ">=25" }
+}
