@@ -9,6 +9,10 @@ public interface IEventBus {
 
     <T extends Event> void addListener(Consumer<T> listener);
 
+    <T extends Event> void addListener(EventPriority priority, Consumer<T> listener);
+
+    <T extends Event> void addListener(EventPriority priority, boolean receiveCanceled, Consumer<T> listener);
+
     <T extends Event> void addListener(Class<T> eventType, Consumer<T> listener);
 
     <T extends Event> void addListener(EventPriority priority, Class<T> eventType, Consumer<T> listener);
