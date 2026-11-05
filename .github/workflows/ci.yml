@@ -3,12 +3,13 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,10 +17,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          cache: gradle
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.7.1'
-      - name: Run tests
-        run: gradle test
-      - name: Build
-        run: gradle build
+          gradle-version: '9.6.0'
+      - name: Run unit tests
+        run: gradle --no-daemon clean test
+      - name: Build all modules
+        run: gradle --no-daemon build
+      - name: Upload runtime JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: mom-fabric-runtime-jars
+          path: |
+            mom-fabric-1201/build/libs/*.jar
+            mom-fabric-263/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 14
