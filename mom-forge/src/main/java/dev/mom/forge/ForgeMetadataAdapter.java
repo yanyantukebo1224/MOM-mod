@@ -8,13 +8,23 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Conservative parser for the common META-INF/mods.toml fields. */
+/** Conservative parser for common META-INF/mods.toml metadata. */
 public final class ForgeMetadataAdapter {
-    private static final Pattern BLOCK = Pattern.compile("(?s)\\[\\[mods]](.*?)(?=\\[\\[|\\z)");
+    private static final Pattern BLOCK = Pattern.compile("(?s)\\[\\[mods\\]\\](.*?)(?=\\[\\[|\\z)");
     private static final Pattern FIELD = Pattern.compile("(?m)^\\s*(modId|version)\\s*=\\s*[\"']([^\"']+)[\"']");
-    private static final Pattern MC_RANGE = Pattern.compile("(?s)\\[\\[dependencies\\.[^]]+]](.*?)(?=\\[\\[|\\z)");
+    private static final Pattern DEPENDENCY = Pattern.compile("(?s)\\[\\[dependencies\\.[^\\]]+\\]\\](.*?)(?=\\[\\[|\\z)");
+    private static final Pattern MINECRAFT_ID = Pattern.compile("(?m)^\\s*modId\\s*=\\s*[\"']minecraft[\"']");
+    private static final Pattern VERSION_RANGE = Pattern.compile("(?m)^\\s*versionRange\\s*=\\s*[\"']([^\"']+)[\"']");
 
     public List<ModDescriptor> parse(String toml) {
+        List<String> minecraftRanges = new ArrayList<>();
+        Matcher dependencies = DEPENDENCY.matcher(toml);
+        while (dependencies.find()) {
+            Matcher id = MINECRAFT_ID.matcher(dependencies.group(1));
+            Matcher range = VERSION_RANGE.matcher(dependencies.group(1));
+            if (id.find() && range.find()) minecraftRanges.add(range.group(1));
+        }
+
         List<ModDescriptor> result = new ArrayList<>();
         Matcher blocks = BLOCK.matcher(toml);
         while (blocks.find()) {
@@ -25,21 +35,8 @@ public final class ForgeMetadataAdapter {
                 if (fields.group(1).equals("version")) version = fields.group(2);
             }
             if (id != null) result.add(new ModDescriptor(id, version, LoaderKind.FORGE,
-                    minecraftRanges(toml), List.of(), List.of(),
+                    minecraftRanges, List.of(), List.of(),
                     List.of("Partial TOML parser: conditional dependency semantics are not evaluated.")));
-        }
-        return List.copyOf(result);
-    }
-
-    private static List<String> minecraftRanges(String toml) {
-        List<String> result = new ArrayList<>();
-        Matcher blocks = MC_RANGE.matcher(toml);
-        while (blocks.find()) {
-            String block = blocks.group(1);
-            if (block.contains("\"minecraft\"") || block.contains("'minecraft'")) {
-                Matcher range = Pattern.compile("versionRange\\s*=\\s*[\"']([^\"']+)[\"']").matcher(block);
-                if (range.find()) result.add(range.group(1));
-            }
         }
         return List.copyOf(result);
     }
