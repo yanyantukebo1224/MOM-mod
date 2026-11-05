@@ -7,6 +7,8 @@ import dev.mom.api.AnalysisReport;
 import dev.mom.api.CompatibilityStatus;
 import dev.mom.api.LoaderKind;
 import dev.mom.api.ModDescriptor;
+import dev.mom.forge.ForgeMetadataAdapter;
+import dev.mom.neoforge.NeoForgeMetadataAdapter;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -16,18 +18,13 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** Static, non-executing first-pass JAR analyzer. Archive classes are never loaded. */
 public final class JarAnalyzer {
-    private static final Pattern TOML_MOD_BLOCK = Pattern.compile("(?s)\\[\\[mods\\]\\](.*?)(?=\\[\\[|\\z)");
-    private static final Pattern TOML_FIELD = Pattern.compile("(?m)^\\s*(modId|version)\\s*=\\s*[\"']([^\"']+)[\"']");
-    private static final Pattern TOML_DEPENDENCY = Pattern.compile("(?s)\\[\\[dependencies\\.([A-Za-z0-9_.-]+)\\]\\](.*?)(?=\\[\\[|\\z)");
-    private static final Pattern TOML_DEP_MOD_ID = Pattern.compile("(?m)^\\s*modId\\s*=\\s*[\"']minecraft[\"']");
-    private static final Pattern TOML_VERSION_RANGE = Pattern.compile("(?m)^\\s*versionRange\\s*=\\s*[\"']([^\"']+)[\"']");
+    private final ForgeMetadataAdapter forgeAdapter = new ForgeMetadataAdapter();
+    private final NeoForgeMetadataAdapter neoForgeAdapter = new NeoForgeMetadataAdapter();
 
     public AnalysisReport analyze(Path jar) {
         List<ModDescriptor> mods = new ArrayList<>();
@@ -46,15 +43,14 @@ public final class JarAnalyzer {
                     mods.add(parseFabric(JsonParser.parseReader(reader).getAsJsonObject()));
                 }
             }
-            if (forge != null) mods.addAll(parseToml(read(zip, forge), LoaderKind.FORGE));
-            if (neo != null) mods.addAll(parseToml(read(zip, neo), LoaderKind.NEOFORGE));
+            if (forge != null) mods.addAll(forgeAdapter.parse(read(zip, forge)));
+            if (neo != null) mods.addAll(neoForgeAdapter.parse(read(zip, neo)));
             if (mods.isEmpty()) {
                 findings.add("No recognized Fabric, Forge, or NeoForge metadata was found.");
                 return new AnalysisReport(jar, CompatibilityStatus.UNKNOWN, mods, findings, errors);
             }
-            int classCount = countClasses(zip);
-            findings.add("Archive contains " + classCount + " class file(s).");
-            if (classCount > 0) findings.add("Bytecode references and injection targets are not yet analyzed.");
+            findings.add("Archive contains " + countClasses(zip) + " class file(s).");
+            findings.add("Bytecode references, mixin targets, and runtime behavior are not yet analyzed.");
             for (ModDescriptor mod : mods) {
                 if (!mod.mixinConfigs().isEmpty()) findings.add(mod.id() + " declares mixin configuration(s): " + mod.mixinConfigs());
                 if (mod.loader() != LoaderKind.FABRIC) findings.add(mod.id() + " needs a " + mod.loader() + " runtime bridge; detection is not loadability.");
@@ -86,29 +82,6 @@ public final class JarAnalyzer {
             if (mc != null) constraints.add(mc.toString());
         }
         return new ModDescriptor(id, version, LoaderKind.FABRIC, constraints, entrypoints, mixins, List.of());
-    }
-
-    private static List<ModDescriptor> parseToml(String text, LoaderKind loader) {
-        List<String> constraints = new ArrayList<>();
-        Matcher dependency = TOML_DEPENDENCY.matcher(text);
-        while (dependency.find()) {
-            Matcher id = TOML_DEP_MOD_ID.matcher(dependency.group(2));
-            Matcher range = TOML_VERSION_RANGE.matcher(dependency.group(2));
-            if (id.find() && range.find()) constraints.add(range.group(1));
-        }
-        List<ModDescriptor> result = new ArrayList<>();
-        Matcher blocks = TOML_MOD_BLOCK.matcher(text);
-        while (blocks.find()) {
-            String id = null, version = "unknown";
-            Matcher fields = TOML_FIELD.matcher(blocks.group(1));
-            while (fields.find()) {
-                if (fields.group(1).equals("modId")) id = fields.group(2);
-                if (fields.group(1).equals("version")) version = fields.group(2);
-            }
-            if (id != null) result.add(new ModDescriptor(id, version, loader, constraints,
-                    List.of(), List.of(), List.of("TOML support is conservative; conditional dependency semantics are not evaluated.")));
-        }
-        return result;
     }
 
     private static String read(ZipFile zip, ZipEntry entry) throws IOException {
