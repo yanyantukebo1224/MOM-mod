@@ -6,10 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import java.nio.file.Files;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,8 +28,24 @@ class JarAnalyzerTest {
         }
         var report = new JarAnalyzer().analyze(jar);
         assertEquals(CompatibilityStatus.ANALYZED, report.status());
-        assertEquals("sample", report.mods().getFirst().id());
-        assertEquals(LoaderKind.FABRIC, report.mods().getFirst().loader());
+        assertEquals("sample", report.mods().get(0).id());
+        assertEquals(LoaderKind.FABRIC, report.mods().get(0).loader());
+    }
+
+    @Test void detectsForgeMetadata() throws Exception {
+        Path jar = temp.resolve("forge-sample.jar");
+        try (var out = new ZipOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new ZipEntry("META-INF/mods.toml"));
+            String toml = "[[mods]]\nmodId=\"sampleforge\"\nversion=\"1.2.3\"\n"
+                    + "[[dependencies.sampleforge]]\nmodId=\"minecraft\"\nversionRange=\"[1.20.1,1.21)\"\n";
+            out.write(toml.getBytes(StandardCharsets.UTF_8));
+            out.closeEntry();
+        }
+        var report = new JarAnalyzer().analyze(jar);
+        assertEquals(CompatibilityStatus.ANALYZED, report.status());
+        assertEquals("sampleforge", report.mods().get(0).id());
+        assertEquals(LoaderKind.FORGE, report.mods().get(0).loader());
+        assertEquals("[1.20.1,1.21)", report.mods().get(0).minecraftConstraints().get(0));
     }
 
     @Test void rejectsNonJarInput() {
