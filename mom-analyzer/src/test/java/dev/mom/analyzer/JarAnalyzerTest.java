@@ -48,6 +48,19 @@ class JarAnalyzerTest {
         assertEquals("[1.20.1,1.21)", report.mods().get(0).minecraftConstraints().get(0));
     }
 
+    @Test void detectsNeoForgeMetadata() throws Exception {
+        Path jar = temp.resolve("neo-sample.jar");
+        try (var out = new ZipOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new ZipEntry("META-INF/neoforge.mods.toml"));
+            out.write("[[mods]]\\nmodId=\\"sampleneo\\"\\nversion=\\"2.0.0\\"\\n".getBytes(StandardCharsets.UTF_8));
+            out.closeEntry();
+        }
+        var report = new JarAnalyzer().analyze(jar);
+        assertEquals(CompatibilityStatus.ANALYZED, report.status());
+        assertEquals("sampleneo", report.mods().get(0).id());
+        assertEquals(LoaderKind.NEOFORGE, report.mods().get(0).loader());
+    }
+
     @Test void rejectsNonJarInput() {
         var report = new JarAnalyzer().analyze(temp.resolve("not-a-jar.txt"));
         assertEquals(CompatibilityStatus.UNSUPPORTED, report.status());
