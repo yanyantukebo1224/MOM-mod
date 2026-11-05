@@ -14,8 +14,9 @@ tasks.withType<JavaCompile>().configureEach {
 
 val forgeFixtureJar by tasks.registering(Jar::class) {
     archiveClassifier.set("forge-fixture")
-    from(sourceSets.test.get().output)
-    include("dev/mom/fabric/fixtures/**")
+    from(sourceSets.test.get().output) {
+        include("dev/mom/fabric/fixtures/**")
+    }
     from("src/test/resources/forge-fixture") {
         include("META-INF/mods.toml")
     }
