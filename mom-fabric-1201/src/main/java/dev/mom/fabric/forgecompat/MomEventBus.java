@@ -15,10 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-/**
- * Small synchronous event bus implementing the MOM-supported Forge API subset.
- * It intentionally does not claim full Forge EventBus binary compatibility.
- */
+/** Small synchronous event bus implementing the explicitly supported Forge subset. */
 public final class MomEventBus implements IEventBus {
     private record Handler(Class<? extends Event> eventType, EventPriority priority,
                            boolean receiveCanceled, long sequence, Consumer<Event> callback) { }
@@ -47,12 +44,23 @@ public final class MomEventBus implements IEventBus {
         }
     }
 
+    /**
+     * Forge's generic Consumer overload erases its event type in bytecode.
+     * Dispatching to the small set of lifecycle events and ignoring bridge casts
+     * lets ordinary method references such as addListener(this::commonSetup) work.
+     * Mods needing precise dispatch should use the typed overload.
+     */
     @Override
     public <T extends Event> void addListener(Consumer<T> listener) {
-        Class<?> eventType = inferEventType(listener);
-        @SuppressWarnings("unchecked")
-        Class<T> typed = (Class<T>) eventType;
-        addListener(EventPriority.NORMAL, false, typed, listener);
+        if (listener == null) throw new NullPointerException("listener");
+        add(Event.class, EventPriority.NORMAL, false, event -> {
+            try {
+                @SuppressWarnings("unchecked") T typed = (T) event;
+                listener.accept(typed);
+            } catch (ClassCastException wrongEventType) {
+                // The erased Consumer bridge rejects lifecycle events of another type.
+            }
+        });
     }
 
     @Override
@@ -85,16 +93,6 @@ public final class MomEventBus implements IEventBus {
     private void add(Class<? extends Event> type, EventPriority priority, boolean receiveCanceled,
                      Consumer<Event> callback) {
         handlers.add(new Handler(type, priority, receiveCanceled, sequence.getAndIncrement(), callback));
-    }
-
-    private static Class<?> inferEventType(Consumer<?> listener) {
-        if (listener == null) throw new NullPointerException("listener");
-        for (Method method : listener.getClass().getDeclaredMethods()) {
-            if (!method.getName().equals("accept") || method.getParameterCount() != 1) continue;
-            Class<?> parameter = method.getParameterTypes()[0];
-            if (parameter != Object.class && Event.class.isAssignableFrom(parameter)) return parameter;
-        }
-        throw new IllegalArgumentException("Cannot infer event type from this listener; use addListener(priority, eventClass, listener)");
     }
 
     private static void invoke(Method method, Object receiver, Event event) {

@@ -38,6 +38,14 @@ class MomEventBusTest {
         assertEquals(1, calls[0]);
     }
 
+    @Test void dispatchesForgeStyleMethodReferencesWithErasedConsumerType() {
+        MomEventBus bus = new MomEventBus();
+        Subscriber subscriber = new Subscriber();
+        bus.addListener(subscriber::setup);
+        bus.post(new FMLCommonSetupEvent());
+        assertEquals(List.of("setup"), subscriber.calls);
+    }
+
     @Test void skipsListenersWhenCanceledUnlessOptedIn() {
         MomEventBus bus = new MomEventBus();
         int[] calls = {0};
@@ -46,6 +54,12 @@ class MomEventBusTest {
         CancelableEvent event = new CancelableEvent();
         event.setCanceled(true);
         assertTrue(bus.post(event));
+        assertEquals(1, calls[0]);
+    }
+
+    @Test void commonSetupEnqueueWorkCompletesSynchronously() {
+        int[] calls = {0};
+        new FMLCommonSetupEvent().enqueueWork(() -> calls[0]++).join();
         assertEquals(1, calls[0]);
     }
 }
