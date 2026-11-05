@@ -84,34 +84,28 @@ public final class MomForgeModLoader {
             return new LoadResult(jars.size(), 0, diagnostics);
         }
 
-        try {
-            classLoader = new URLClassLoader(urls.toArray(URL[]::new), MomForgeModLoader.class.getClassLoader());
-            List<LoadedMod> loaded = new ArrayList<>();
-            Set<String> loadedIds = new HashSet<>();
-            for (ModJar candidate : candidates) {
-                int before = loaded.size();
-                scanAndConstruct(candidate, loaded, loadedIds, diagnostics);
-                if (loaded.size() == before) {
-                    diagnostics.add(candidate.path().getFileName() + ": no matching, constructible @Mod class was found.");
-                }
+        classLoader = new URLClassLoader(urls.toArray(URL[]::new), MomForgeModLoader.class.getClassLoader());
+        List<LoadedMod> loaded = new ArrayList<>();
+        Set<String> loadedIds = new HashSet<>();
+        for (ModJar candidate : candidates) {
+            int before = loaded.size();
+            scanAndConstruct(candidate, loaded, loadedIds, diagnostics);
+            if (loaded.size() == before) {
+                diagnostics.add(candidate.path().getFileName() + ": no matching, constructible @Mod class was found.");
             }
-
-            for (LoadedMod mod : loaded) {
-                try { mod.bus().post(new FMLCommonSetupEvent()); }
-                catch (RuntimeException ex) { diagnostics.add(mod.id() + ": common setup failed: " + ex); }
-            }
-            for (LoadedMod mod : loaded) {
-                try { mod.bus().post(new FMLLoadCompleteEvent()); }
-                catch (RuntimeException ex) { diagnostics.add(mod.id() + ": load-complete failed: " + ex); }
-            }
-            diagnostics.forEach(s -> System.out.println("[MOM/Forge] " + s));
-            System.out.println("[MOM/Forge] Loaded " + loaded.size() + " Forge-style mod(s) from " + candidates.size() + " JAR(s).");
-            return new LoadResult(jars.size(), loaded.size(), diagnostics);
-        } catch (IOException ex) {
-            diagnostics.add("Could not create mod class loader: " + ex.getMessage());
-            diagnostics.forEach(s -> System.err.println("[MOM/Forge] " + s));
-            return new LoadResult(jars.size(), 0, diagnostics);
         }
+
+        for (LoadedMod mod : loaded) {
+            try { mod.bus().post(new FMLCommonSetupEvent()); }
+            catch (RuntimeException ex) { diagnostics.add(mod.id() + ": common setup failed: " + ex); }
+        }
+        for (LoadedMod mod : loaded) {
+            try { mod.bus().post(new FMLLoadCompleteEvent()); }
+            catch (RuntimeException ex) { diagnostics.add(mod.id() + ": load-complete failed: " + ex); }
+        }
+        diagnostics.forEach(s -> System.out.println("[MOM/Forge] " + s));
+        System.out.println("[MOM/Forge] Loaded " + loaded.size() + " Forge-style mod(s) from " + candidates.size() + " JAR(s).");
+        return new LoadResult(jars.size(), loaded.size(), diagnostics);
     }
 
     private void scanAndConstruct(ModJar candidate, List<LoadedMod> loaded,
